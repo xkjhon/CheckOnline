@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "439058638159",
+    "project_id": "checkonline-mfgo",
+    "storage_bucket": "checkonline-mfgo.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:439058638159:android:2964f9bcb24f3bac16d13a",
+        "android_client_info": {
+          "package_name": "br.com.meirelesefreitas.go.checkonline"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBwmdUZpjZFF5tiQSd8TlKTMM_aSlt38P0"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
