@@ -3,6 +3,19 @@ package br.com.meirelesefreitas.go.checkonline.data.model
 import com.google.firebase.firestore.DocumentSnapshot
 import com.google.firebase.firestore.PropertyName
 
+enum class ColaboradorAct(val code: String, val title: String, val description: String) {
+    AGENTE_COMERCIAL("agcom", "Agente Comercial", "Vistoria Comercial & Equipamentos"),
+    LEITURISTA_PEDESTRE("leitpe", "Leiturista Pedestre", "Vistoria de Campo Pedestre"),
+    LEITURISTA_MOTORISTA("leitmo", "Leiturista Motorista", "Vistoria de Campo & Veículo");
+
+    companion object {
+        fun fromCode(code: String?): ColaboradorAct? {
+            val clean = code?.trim()?.lowercase() ?: return null
+            return entries.find { it.code == clean }
+        }
+    }
+}
+
 data class Colaborador(
     val matricula: String = "",
     val nome: String = "",
@@ -15,8 +28,15 @@ data class Colaborador(
     @set:PropertyName("ven-cnh")
     var venCnh: String = "",
     val senha: String = "",
-    val mode: Long = 0L // 0 = Ativo, 1 = Primeiro Acesso pendente, 2 = Restaurar Senha pendente
+    val mode: Long = 0L, // 0 = Ativo, 1 = Primeiro Acesso pendente, 2 = Restaurar Senha pendente
+    val act: String = "" // "agcom" = Agente Comercial, "leitpe" = Leiturista Pedestre, "leitmo" = Leiturista Motorista
 ) {
+    val actEnum: ColaboradorAct?
+        get() = ColaboradorAct.fromCode(act)
+
+    val funcaoDescricao: String
+        get() = actEnum?.title ?: if (act.isNotBlank()) act else "Agente Comercial"
+
     companion object {
         fun fromSnapshot(doc: DocumentSnapshot): Colaborador? {
             if (!doc.exists()) return null
@@ -34,6 +54,7 @@ data class Colaborador(
             val venCnh = doc.getString("ven-cnh") ?: doc.getString("venCnh") ?: ""
             val senha = doc.getString("senha") ?: ""
             val mode = doc.getLong("mode") ?: 0L
+            val act = doc.getString("act") ?: ""
 
             return Colaborador(
                 matricula = matricula,
@@ -45,7 +66,8 @@ data class Colaborador(
                 placa = placa,
                 venCnh = venCnh,
                 senha = senha,
-                mode = mode
+                mode = mode,
+                act = act
             )
         }
     }

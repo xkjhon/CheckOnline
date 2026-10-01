@@ -16,11 +16,12 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.AccessTime
 import androidx.compose.material.icons.filled.CheckCircle
 import androidx.compose.material.icons.filled.CloudDone
+import androidx.compose.material.icons.filled.CloudOff
 import androidx.compose.material.icons.filled.CloudSync
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.WarningAmber
 import androidx.compose.material3.Button
@@ -44,7 +45,9 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import br.com.meirelesefreitas.go.checkonline.ui.components.ExpressiveCard
 import br.com.meirelesefreitas.go.checkonline.ui.components.HomeScreenSkeleton
+import br.com.meirelesefreitas.go.checkonline.ui.theme.ExpressiveError
 import br.com.meirelesefreitas.go.checkonline.ui.theme.ExpressiveShapes
+import br.com.meirelesefreitas.go.checkonline.ui.theme.ExpressiveWarning
 import br.com.meirelesefreitas.go.checkonline.utils.DateUtils
 
 @Composable
@@ -75,7 +78,7 @@ fun HomeScreen(
                 .verticalScroll(rememberScrollState())
                 .padding(start = 20.dp, end = 20.dp, top = 8.dp, bottom = 16.dp)
         ) {
-            // Header: "CheckOnline"
+            // Header: "CheckOnline" + Online/Offline badge
             Row(
                 modifier = Modifier.fillMaxWidth(),
                 horizontalArrangement = Arrangement.SpaceBetween,
@@ -90,8 +93,12 @@ fun HomeScreen(
                         )
                     )
                     if (uiState.colaborador != null) {
+                        val firstName = uiState.colaborador?.nome?.split(" ")?.firstOrNull() ?: "Colaborador"
+                        val loc = uiState.colaborador?.localidade ?: ""
+                        val funcao = uiState.colaborador?.funcaoDescricao ?: ""
+                        val details = listOfNotNull(loc.ifEmpty { null }, funcao.ifEmpty { null }).joinToString(" • ")
                         Text(
-                            text = "Olá, ${uiState.colaborador?.nome?.split(" ")?.firstOrNull() ?: "Colaborador"} • ${uiState.colaborador?.localidade}",
+                            text = "Olá, $firstName${if (details.isNotEmpty()) " • $details" else ""}",
                             style = MaterialTheme.typography.bodyMedium.copy(
                                 color = MaterialTheme.colorScheme.onSurfaceVariant
                             )
@@ -101,7 +108,11 @@ fun HomeScreen(
 
                 Surface(
                     shape = CircleShape,
-                    color = MaterialTheme.colorScheme.surfaceVariant,
+                    color = if (!uiState.isOnline) {
+                        if (isDark) Color(0xFF382600) else Color(0xFFFFF0D4)
+                    } else {
+                        MaterialTheme.colorScheme.surfaceVariant
+                    },
                     modifier = Modifier.size(38.dp)
                 ) {
                     Box(
@@ -114,11 +125,18 @@ fun HomeScreen(
                                 strokeWidth = 2.dp,
                                 color = MaterialTheme.colorScheme.primary
                             )
-                        } else {
+                        } else if (uiState.isOnline) {
                             Icon(
                                 imageVector = Icons.Default.CloudDone,
                                 contentDescription = "Online",
                                 tint = MaterialTheme.colorScheme.primary,
+                                modifier = Modifier.size(20.dp)
+                            )
+                        } else {
+                            Icon(
+                                imageVector = Icons.Default.CloudOff,
+                                contentDescription = "Offline",
+                                tint = ExpressiveWarning,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -206,7 +224,11 @@ fun HomeScreen(
                                 )
                                 Spacer(modifier = Modifier.width(8.dp))
                                 Text(
-                                    text = "Checklist de hoje já realizado ✓",
+                                    text = if (uiState.pendingSyncCount > 0) {
+                                        "Checklist de hoje gravado no celular ✓"
+                                    } else {
+                                        "Checklist de hoje já realizado ✓"
+                                    },
                                     style = MaterialTheme.typography.titleSmall.copy(
                                         fontWeight = FontWeight.Bold,
                                         color = badgeText
@@ -244,7 +266,7 @@ fun HomeScreen(
                             )
                             Spacer(modifier = Modifier.width(6.dp))
                             Icon(
-                                imageVector = Icons.Default.KeyboardArrowRight,
+                                imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                                 contentDescription = null,
                                 modifier = Modifier.size(18.dp)
                             )
@@ -255,7 +277,7 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // ================= BANNER 2: Dias Pendentes (Alto Contraste no Dark Mode) =================
+            // ================= BANNER 2: Dias Pendentes =================
             val hasPending = uiState.pendingBusinessDays.isNotEmpty()
             val pendingContainerBg = when {
                 hasPending && isDark -> Color(0xFF3B2500)
@@ -340,14 +362,19 @@ fun HomeScreen(
 
             Spacer(modifier = Modifier.height(14.dp))
 
-            // ================= BANNER 3: Sincronização Offline =================
+            // ================= BANNER 3: Sincronização & Status Offline =================
+            val hasPendingSync = uiState.pendingSyncCount > 0
             val hasLongSyncDelay = uiState.daysWithoutSync >= 2
             val syncContainerBg = when {
+                hasPendingSync && isDark -> Color(0xFF382600)
+                hasPendingSync && !isDark -> Color(0xFFFFF0D4)
                 hasLongSyncDelay && isDark -> Color(0xFF491111)
                 hasLongSyncDelay && !isDark -> Color(0xFFFAD2CF)
                 else -> MaterialTheme.colorScheme.surfaceVariant
             }
             val syncTitleColor = when {
+                hasPendingSync && isDark -> Color(0xFFFFD54F)
+                hasPendingSync && !isDark -> Color(0xFFB45309)
                 hasLongSyncDelay && isDark -> Color(0xFFFFB4AB)
                 hasLongSyncDelay && !isDark -> Color(0xFF93000A)
                 else -> MaterialTheme.colorScheme.onSurface
@@ -366,18 +393,24 @@ fun HomeScreen(
                         modifier = Modifier.weight(1f)
                     ) {
                         Icon(
-                            imageVector = if (hasLongSyncDelay) Icons.Default.WarningAmber else Icons.Default.CloudSync,
+                            imageVector = when {
+                                hasPendingSync -> Icons.Default.CloudSync
+                                !uiState.isOnline -> Icons.Default.CloudOff
+                                hasLongSyncDelay -> Icons.Default.WarningAmber
+                                else -> Icons.Default.CloudDone
+                            },
                             contentDescription = null,
-                            tint = if (hasLongSyncDelay) syncTitleColor else MaterialTheme.colorScheme.primary,
-                            modifier = Modifier.size(22.dp)
+                            tint = if (hasPendingSync || !uiState.isOnline) syncTitleColor else MaterialTheme.colorScheme.primary,
+                            modifier = Modifier.size(24.dp)
                         )
                         Spacer(modifier = Modifier.width(10.dp))
                         Column {
                             Text(
-                                text = if (hasLongSyncDelay) {
-                                    "${uiState.daysWithoutSync} Dias sem sincronização"
-                                } else {
-                                    "Sincronização Offline"
+                                text = when {
+                                    hasPendingSync -> "${uiState.pendingSyncCount} Checklist(s) pendente(s)"
+                                    !uiState.isOnline -> "Modo Offline Ativo"
+                                    hasLongSyncDelay -> "${uiState.daysWithoutSync} Dias sem sincronização"
+                                    else -> "Histórico Local Sincronizado"
                                 },
                                 style = MaterialTheme.typography.titleSmall.copy(
                                     fontWeight = FontWeight.Bold,
@@ -385,10 +418,10 @@ fun HomeScreen(
                                 )
                             )
                             Text(
-                                text = if (hasLongSyncDelay) {
-                                    "Dados acumulados no aparelho"
-                                } else {
-                                    "Base pronta para uso offline"
+                                text = when {
+                                    hasPendingSync -> "Gravado no celular. Enviará ao conectar à internet."
+                                    !uiState.isOnline -> "Funcionalidades e histórico salvos no celular."
+                                    else -> "Banco local pronto para uso offline."
                                 },
                                 style = MaterialTheme.typography.bodySmall.copy(
                                     color = MaterialTheme.colorScheme.onSurfaceVariant
@@ -401,10 +434,14 @@ fun HomeScreen(
 
                     Button(
                         onClick = viewModel::synchronize,
-                        enabled = !uiState.isSyncing,
+                        enabled = !uiState.isSyncing && uiState.isOnline,
                         shape = ExpressiveShapes.small,
                         colors = ButtonDefaults.buttonColors(
-                            containerColor = if (hasLongSyncDelay) MaterialTheme.colorScheme.error else MaterialTheme.colorScheme.primary
+                            containerColor = when {
+                                hasPendingSync -> ExpressiveWarning
+                                hasLongSyncDelay -> ExpressiveError
+                                else -> MaterialTheme.colorScheme.primary
+                            }
                         )
                     ) {
                         if (uiState.isSyncing) {

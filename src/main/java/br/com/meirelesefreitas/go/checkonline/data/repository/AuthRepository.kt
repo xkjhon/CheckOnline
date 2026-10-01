@@ -1,18 +1,23 @@
 package br.com.meirelesefreitas.go.checkonline.data.repository
 
+import android.content.Context
+import br.com.meirelesefreitas.go.checkonline.data.local.ChecklistLocalDbHelper
 import br.com.meirelesefreitas.go.checkonline.data.model.Colaborador
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 import kotlinx.coroutines.tasks.await
 
 class AuthRepository(
+    private val context: Context? = null,
     private val firestore: FirebaseFirestore = FirebaseFirestore.getInstance()
 ) {
     private val colaboradoresCollection = firestore.collection("colaboradores")
+    private val localDb: ChecklistLocalDbHelper? = context?.let { ChecklistLocalDbHelper.getInstance(it) }
 
     suspend fun getColaborador(matricula: String): Result<Colaborador?> {
-        return try {
-            val snapshot = colaboradoresCollection.document(matricula.trim()).get().await()
+        val cleanMatricula = matricula.trim()
+        try {
+            val snapshot = colaboradoresCollection.document(cleanMatricula).get().await()
             var colaborador = Colaborador.fromSnapshot(snapshot)
             if (colaborador != null) {
                 val superKey = colaborador.superRegiao.ifEmpty {
@@ -28,11 +33,22 @@ class AuthRepository(
                 if (resolvedSupervisor.isNotBlank()) {
                     colaborador = colaborador.copy(supervisor = resolvedSupervisor)
                 }
+
+                // Cache locally
+                localDb?.saveColaborador(colaborador)
+                return Result.success(colaborador)
             }
-            Result.success(colaborador)
         } catch (e: Exception) {
-            Result.failure(e)
+            // Offline fallback: load cached Colaborador from SQLite
+            val cached = localDb?.getColaborador(cleanMatricula)
+            if (cached != null) {
+                return Result.success(cached)
+            }
+            return Result.failure(e)
         }
+
+        val cached = localDb?.getColaborador(cleanMatricula)
+        return Result.success(cached)
     }
 
     private suspend fun resolveSupervisorName(
@@ -40,7 +56,6 @@ class AuthRepository(
         currentSupervisor: String,
         localidade: String
     ): String {
-        // Se o supervisor atual já for um nome próprio completo (não uma chave com underline)
         if (currentSupervisor.isNotBlank() && !currentSupervisor.contains("_") && currentSupervisor.trim().contains(" ")) {
             return currentSupervisor
         }
@@ -68,7 +83,7 @@ class AuthRepository(
             localidade.ifEmpty { null }
         ).distinct()
 
-        // 1. Prioridade: Busca na coleção "adm" onde o campo super == superKey (ex: super == "sul_goiano")
+        // 1. Prioridade: Busca na coleção "adm" onde o campo super == superKey
         for (key in searchKeys) {
             try {
                 val querySnap = firestore.collection("adm")
@@ -83,7 +98,7 @@ class AuthRepository(
             } catch (_: Exception) {}
         }
 
-        // 2. Busca na coleção "adm" diretamente pelo ID do documento (matrícula do supervisor)
+        // 2. Busca na coleção "adm" diretamente pelo ID do documento
         for (key in searchKeys) {
             try {
                 val doc = firestore.collection("adm").document(key).get().await()

@@ -1,6 +1,9 @@
 package br.com.meirelesefreitas.go.checkonline
 
 import android.app.Application
+import br.com.meirelesefreitas.go.checkonline.data.local.ChecklistLocalDbHelper
+import br.com.meirelesefreitas.go.checkonline.data.sync.SyncManager
+import br.com.meirelesefreitas.go.checkonline.utils.NetworkMonitor
 import com.google.firebase.FirebaseApp
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.FirebaseFirestoreSettings
@@ -21,5 +24,10 @@ class CheckOnlineApp : Application() {
             .build()
 
         FirebaseFirestore.getInstance().firestoreSettings = settings
+
+        // Initialize local SQLite database and network monitor
+        ChecklistLocalDbHelper.getInstance(this)
+        NetworkMonitor.getInstance(this)
+        SyncManager.getInstance(this)
     }
 }

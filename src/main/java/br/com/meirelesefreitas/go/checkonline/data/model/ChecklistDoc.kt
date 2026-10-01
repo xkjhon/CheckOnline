@@ -1,6 +1,5 @@
 package br.com.meirelesefreitas.go.checkonline.data.model
 
-import com.google.firebase.Timestamp
 import com.google.firebase.firestore.DocumentSnapshot
 import java.util.Date
 
@@ -10,13 +9,20 @@ data class ChecklistDoc(
     val observacao: String = "",
     val matricula: String = "",
     val localidade: String = "",
-    val answers: Map<Int, Boolean> = emptyMap()
+    val answers: Map<Int, Int> = emptyMap(), // Map<QuestionId, AnswerCode (1=Sim, 2=Não, 3=N/A)>
+    val isPendingSync: Boolean = false // Indica se foi gravado offline e aguarda envio ao Firestore
 ) {
     val totalSim: Int
-        get() = answers.values.count { it }
+        get() = answers.values.count { it == ChecklistAnswer.SIM.code }
 
     val totalNao: Int
-        get() = answers.values.count { !it }
+        get() = answers.values.count { it == ChecklistAnswer.NAO.code }
+
+    val totalNa: Int
+        get() = answers.values.count { it == ChecklistAnswer.NAO_APLICA.code }
+
+    val hasInconformidade: Boolean
+        get() = totalNao > 0
 
     companion object {
         fun fromSnapshot(doc: DocumentSnapshot): ChecklistDoc {
@@ -27,13 +33,13 @@ data class ChecklistDoc(
             val matricula = doc.getString("matricula") ?: ""
             val localidade = doc.getString("cidade") ?: doc.getString("localidade") ?: ""
 
-            val answersMap = mutableMapOf<Int, Boolean>()
+            val answersMap = mutableMapOf<Int, Int>()
             val dataMap = doc.data
             if (dataMap != null) {
                 for ((key, value) in dataMap) {
                     val questionNum = key.toIntOrNull()
-                    if (questionNum != null && value is Boolean) {
-                        answersMap[questionNum] = value
+                    if (questionNum != null) {
+                        answersMap[questionNum] = ChecklistAnswer.fromAny(value).code
                     }
                 }
             }
@@ -44,7 +50,8 @@ data class ChecklistDoc(
                 observacao = observacao,
                 matricula = matricula,
                 localidade = localidade,
-                answers = answersMap
+                answers = answersMap,
+                isPendingSync = false
             )
         }
     }

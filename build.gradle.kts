@@ -2,6 +2,8 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.kotlin.compose)
     alias(libs.plugins.google.services)
+
+
 }
 
 android {
@@ -15,7 +17,7 @@ android {
         minSdk = 26
         targetSdk = 37
         versionCode = 1
-        versionName = "0.1.2beta"
+        versionName = "0.3beta"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }

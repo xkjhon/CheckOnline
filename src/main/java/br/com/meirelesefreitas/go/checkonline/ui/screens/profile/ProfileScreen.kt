@@ -18,6 +18,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.Logout
+import androidx.compose.material.icons.filled.Badge
 import androidx.compose.material.icons.filled.CalendarMonth
 import androidx.compose.material.icons.filled.DirectionsCar
 import androidx.compose.material.icons.filled.Edit
@@ -157,6 +158,14 @@ fun ProfileScreen(
                 )
 
                 Spacer(modifier = Modifier.height(14.dp))
+
+                ProfileInfoRow(
+                    icon = Icons.Default.Badge,
+                    label = "Função / Serviço",
+                    value = uiState.colaborador?.let { "${it.funcaoDescricao} (${if (it.act.isNotBlank()) it.act else "agcom"})" } ?: "-"
+                )
+
+                Spacer(modifier = Modifier.height(10.dp))
 
                 ProfileInfoRow(
                     icon = Icons.Default.SupervisorAccount,

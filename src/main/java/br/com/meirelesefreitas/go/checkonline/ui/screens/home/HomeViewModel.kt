@@ -7,7 +7,10 @@ import br.com.meirelesefreitas.go.checkonline.data.local.UserPreferencesReposito
 import br.com.meirelesefreitas.go.checkonline.data.model.Colaborador
 import br.com.meirelesefreitas.go.checkonline.data.repository.AuthRepository
 import br.com.meirelesefreitas.go.checkonline.data.repository.ChecklistRepository
+import br.com.meirelesefreitas.go.checkonline.data.sync.SyncEvent
+import br.com.meirelesefreitas.go.checkonline.data.sync.SyncManager
 import br.com.meirelesefreitas.go.checkonline.utils.DateUtils
+import br.com.meirelesefreitas.go.checkonline.utils.NetworkMonitor
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -29,6 +32,8 @@ data class HomeUiState(
     val hasAnsweredToday: Boolean = false,
     val pendingBusinessDays: List<LocalDate> = emptyList(),
     val daysWithoutSync: Long = 0,
+    val pendingSyncCount: Int = 0,
+    val isOnline: Boolean = true,
     val isSyncing: Boolean = false,
     val isLoading: Boolean = true,
     val errorMessage: String? = null
@@ -36,9 +41,11 @@ data class HomeUiState(
 
 class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val authRepository = AuthRepository()
-    private val checklistRepository = ChecklistRepository()
+    private val authRepository = AuthRepository(application)
+    private val checklistRepository = ChecklistRepository(application)
     private val preferencesRepository = UserPreferencesRepository(application)
+    private val networkMonitor = NetworkMonitor.getInstance(application)
+    private val syncManager = SyncManager.getInstance(application)
 
     private val _uiState = MutableStateFlow(HomeUiState())
     val uiState: StateFlow<HomeUiState> = _uiState.asStateFlow()
@@ -48,6 +55,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
     init {
         startRealtimeClock()
+        observeNetwork()
+        observeSyncEvents()
         loadData()
     }
 
@@ -60,6 +69,35 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                     currentDateFullString = DateUtils.formatCurrentDateFull(now)
                 )
                 delay(1000)
+            }
+        }
+    }
+
+    private fun observeNetwork() {
+        viewModelScope.launch {
+            networkMonitor.isOnlineFlow.collect { isOnline ->
+                _uiState.value = _uiState.value.copy(isOnline = isOnline)
+                if (isOnline) {
+                    loadData()
+                }
+            }
+        }
+    }
+
+    private fun observeSyncEvents() {
+        viewModelScope.launch {
+            syncManager.syncEvents.collect { event ->
+                when (event) {
+                    is SyncEvent.SyncSuccess -> {
+                        loadData()
+                        if (event.syncedPendingCount > 0) {
+                            _snackbarEvent.emit("${event.syncedPendingCount} checklist(s) sincronizado(s) com sucesso!")
+                        }
+                    }
+                    is SyncEvent.SyncError -> {
+                        _snackbarEvent.emit("Aviso: ${event.message}")
+                    }
+                }
             }
         }
     }
@@ -78,11 +116,11 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 return@launch
             }
 
-            // Load Colaborador details
+            // Load Colaborador details (from local SQLite or Firestore)
             val colabResult = authRepository.getColaborador(matricula)
             val colab = colabResult.getOrNull()
 
-            // Check if already answered today and get all records for pending days
+            // Check if already answered today (from local SQLite DB)
             val answeredTodayResult = checklistRepository.hasAnsweredToday(matricula)
             val hasAnsweredToday = answeredTodayResult.getOrDefault(false)
 
@@ -91,6 +129,8 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
 
             val answeredDates = allChecklists.mapNotNull { it.data }
             val pendingDays = DateUtils.findPendingBusinessDays(answeredDates)
+
+            val pendingSyncCount = checklistRepository.getPendingCount(matricula)
 
             // Calculate days without sync
             val lastSyncTime = prefs.lastSyncTimeMillis
@@ -101,7 +141,9 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
                 colaborador = colab,
                 hasAnsweredToday = hasAnsweredToday,
                 pendingBusinessDays = pendingDays,
+                pendingSyncCount = pendingSyncCount,
                 daysWithoutSync = daysDiff,
+                isOnline = networkMonitor.isCurrentlyOnline(),
                 isLoading = false
             )
         }
@@ -114,21 +156,15 @@ class HomeViewModel(application: Application) : AndroidViewModel(application) {
             val matricula = prefs.activeMatricula.ifEmpty { prefs.savedMatricula }
 
             if (matricula.isNotEmpty()) {
-                // Refresh data from server
-                val answeredToday = checklistRepository.hasAnsweredToday(matricula).getOrDefault(false)
-                val allChecklists = checklistRepository.getAllChecklists(matricula).getOrDefault(emptyList())
-                val answeredDates = allChecklists.mapNotNull { it.data }
-                val pendingDays = DateUtils.findPendingBusinessDays(answeredDates)
-
-                preferencesRepository.updateLastSyncTime(System.currentTimeMillis())
-
-                _uiState.value = _uiState.value.copy(
-                    hasAnsweredToday = answeredToday,
-                    pendingBusinessDays = pendingDays,
-                    daysWithoutSync = 0,
-                    isSyncing = false
-                )
-                _snackbarEvent.emit("Sincronização com o Firestore concluída!")
+                val syncResult = syncManager.syncAll(matricula)
+                syncResult.onSuccess { (syncedCount, downloaded) ->
+                    loadData()
+                    _uiState.value = _uiState.value.copy(isSyncing = false)
+                    _snackbarEvent.emit("Sincronização concluída! ($downloaded vistorias no dispositivo)")
+                }.onFailure { e ->
+                    _uiState.value = _uiState.value.copy(isSyncing = false)
+                    _snackbarEvent.emit(e.localizedMessage ?: "Erro na sincronização")
+                }
             } else {
                 _uiState.value = _uiState.value.copy(isSyncing = false)
             }

@@ -23,11 +23,13 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material.icons.filled.CloudQueue
 import androidx.compose.material.icons.filled.Description
-import androidx.compose.material.icons.filled.KeyboardArrowRight
 import androidx.compose.material.icons.filled.PictureAsPdf
+import androidx.compose.material.icons.filled.Remove
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
@@ -59,6 +61,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
+import br.com.meirelesefreitas.go.checkonline.data.model.ChecklistAnswer
 import br.com.meirelesefreitas.go.checkonline.data.model.ChecklistDoc
 import br.com.meirelesefreitas.go.checkonline.ui.components.ExpressivePrimaryButton
 import br.com.meirelesefreitas.go.checkonline.ui.components.HistoryScreenSkeleton
@@ -67,6 +70,8 @@ import br.com.meirelesefreitas.go.checkonline.ui.theme.ExpressiveErrorContainer
 import br.com.meirelesefreitas.go.checkonline.ui.theme.ExpressiveShapes
 import br.com.meirelesefreitas.go.checkonline.ui.theme.ExpressiveSuccess
 import br.com.meirelesefreitas.go.checkonline.ui.theme.ExpressiveSuccessContainer
+import br.com.meirelesefreitas.go.checkonline.ui.theme.ExpressiveWarning
+import br.com.meirelesefreitas.go.checkonline.ui.theme.ExpressiveWarningContainer
 import br.com.meirelesefreitas.go.checkonline.utils.CheckListItems
 import br.com.meirelesefreitas.go.checkonline.utils.DateUtils
 import br.com.meirelesefreitas.go.checkonline.utils.PdfGenerator
@@ -118,7 +123,7 @@ fun HistoryScreen(
                         )
                     )
                     Text(
-                        text = "Vistorias realizadas em campo",
+                        text = "Vistorias salvas no dispositivo",
                         style = MaterialTheme.typography.bodySmall.copy(
                             color = MaterialTheme.colorScheme.onSurfaceVariant
                         )
@@ -287,28 +292,56 @@ fun HistoryItemCard(
                 Row(verticalAlignment = Alignment.CenterVertically) {
                     Surface(
                         shape = CircleShape,
-                        color = MaterialTheme.colorScheme.primaryContainer,
+                        color = if (doc.isPendingSync) ExpressiveWarningContainer else MaterialTheme.colorScheme.primaryContainer,
                         modifier = Modifier.size(34.dp)
                     ) {
                         Box(contentAlignment = Alignment.Center) {
-                            Text(
-                                text = "#${doc.id}",
-                                style = MaterialTheme.typography.labelSmall.copy(
-                                    fontWeight = FontWeight.Bold,
-                                    color = MaterialTheme.colorScheme.onPrimaryContainer
+                            if (doc.isPendingSync) {
+                                Icon(
+                                    imageVector = Icons.Default.CloudQueue,
+                                    contentDescription = "Pendente de envio",
+                                    tint = ExpressiveWarning,
+                                    modifier = Modifier.size(18.dp)
                                 )
-                            )
+                            } else {
+                                Text(
+                                    text = "#${doc.id}",
+                                    style = MaterialTheme.typography.labelSmall.copy(
+                                        fontWeight = FontWeight.Bold,
+                                        color = MaterialTheme.colorScheme.onPrimaryContainer
+                                    )
+                                )
+                            }
                         }
                     }
                     Spacer(modifier = Modifier.width(10.dp))
                     Column {
-                        Text(
-                            text = DateUtils.formatDateShort(doc.data),
-                            style = MaterialTheme.typography.titleSmall.copy(
-                                fontWeight = FontWeight.Bold,
-                                color = MaterialTheme.colorScheme.onSurface
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = DateUtils.formatDateShort(doc.data),
+                                style = MaterialTheme.typography.titleSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = MaterialTheme.colorScheme.onSurface
+                                )
                             )
-                        )
+                            if (doc.isPendingSync) {
+                                Spacer(modifier = Modifier.width(6.dp))
+                                Surface(
+                                    shape = ExpressiveShapes.small,
+                                    color = ExpressiveWarningContainer.copy(alpha = 0.7f)
+                                ) {
+                                    Text(
+                                        text = "Pendente",
+                                        style = MaterialTheme.typography.labelSmall.copy(
+                                            fontWeight = FontWeight.Bold,
+                                            color = ExpressiveWarning,
+                                            fontSize = 9.sp
+                                        ),
+                                        modifier = Modifier.padding(horizontal = 4.dp, vertical = 2.dp)
+                                    )
+                                }
+                            }
+                        }
                         Text(
                             text = DateUtils.formatDateTime(doc.data),
                             style = MaterialTheme.typography.bodySmall.copy(
@@ -338,6 +371,22 @@ fun HistoryItemCard(
                         )
                     }
 
+                    if (doc.totalNa > 0) {
+                        Surface(
+                            shape = ExpressiveShapes.small,
+                            color = ExpressiveWarning.copy(alpha = 0.18f)
+                        ) {
+                            Text(
+                                text = "${doc.totalNa} N/A",
+                                style = MaterialTheme.typography.labelSmall.copy(
+                                    fontWeight = FontWeight.Bold,
+                                    color = ExpressiveWarning
+                                ),
+                                modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp)
+                            )
+                        }
+                    }
+
                     if (doc.totalNao > 0) {
                         Surface(
                             shape = ExpressiveShapes.small,
@@ -355,7 +404,7 @@ fun HistoryItemCard(
                     }
 
                     Icon(
-                        imageVector = Icons.Default.KeyboardArrowRight,
+                        imageVector = Icons.AutoMirrored.Filled.KeyboardArrowRight,
                         contentDescription = "Ver detalhes",
                         tint = MaterialTheme.colorScheme.onSurfaceVariant,
                         modifier = Modifier.size(20.dp)
@@ -404,7 +453,7 @@ fun ChecklistDetailsSheetContent(
         ) {
             Column {
                 Text(
-                    text = "Vistoria #${doc.id}",
+                    text = if (doc.isPendingSync) "Vistoria Gravada Offline" else "Vistoria #${doc.id}",
                     style = MaterialTheme.typography.headlineSmall.copy(
                         fontWeight = FontWeight.Bold,
                         color = MaterialTheme.colorScheme.primary
@@ -418,19 +467,84 @@ fun ChecklistDetailsSheetContent(
                 )
             }
 
+            Row(horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+                Surface(
+                    shape = ExpressiveShapes.small,
+                    color = MaterialTheme.colorScheme.primaryContainer,
+                    modifier = Modifier.padding(2.dp)
+                ) {
+                    Text(
+                        text = "${doc.totalSim} OK",
+                        style = MaterialTheme.typography.labelSmall.copy(
+                            fontWeight = FontWeight.Bold,
+                            color = MaterialTheme.colorScheme.onPrimaryContainer
+                        ),
+                        modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                    )
+                }
+
+                if (doc.totalNa > 0) {
+                    Surface(
+                        shape = ExpressiveShapes.small,
+                        color = ExpressiveWarningContainer,
+                        modifier = Modifier.padding(2.dp)
+                    ) {
+                        Text(
+                            text = "${doc.totalNa} N/A",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = ExpressiveWarning
+                            ),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+
+                if (doc.totalNao > 0) {
+                    Surface(
+                        shape = ExpressiveShapes.small,
+                        color = ExpressiveErrorContainer,
+                        modifier = Modifier.padding(2.dp)
+                    ) {
+                        Text(
+                            text = "${doc.totalNao} Não OK",
+                            style = MaterialTheme.typography.labelSmall.copy(
+                                fontWeight = FontWeight.Bold,
+                                color = ExpressiveError
+                            ),
+                            modifier = Modifier.padding(horizontal = 8.dp, vertical = 5.dp)
+                        )
+                    }
+                }
+            }
+        }
+
+        if (doc.isPendingSync) {
+            Spacer(modifier = Modifier.height(10.dp))
             Surface(
                 shape = ExpressiveShapes.small,
-                color = MaterialTheme.colorScheme.primaryContainer,
-                modifier = Modifier.padding(4.dp)
+                color = ExpressiveWarningContainer.copy(alpha = 0.5f),
+                modifier = Modifier.fillMaxWidth()
             ) {
-                Text(
-                    text = "${doc.totalSim} OK / ${doc.totalNao} Não OK",
-                    style = MaterialTheme.typography.labelMedium.copy(
-                        fontWeight = FontWeight.Bold,
-                        color = MaterialTheme.colorScheme.onPrimaryContainer
-                    ),
-                    modifier = Modifier.padding(horizontal = 10.dp, vertical = 6.dp)
-                )
+                Row(
+                    modifier = Modifier.padding(10.dp),
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Icon(
+                        imageVector = Icons.Default.CloudQueue,
+                        contentDescription = null,
+                        tint = ExpressiveWarning,
+                        modifier = Modifier.size(18.dp)
+                    )
+                    Spacer(modifier = Modifier.width(8.dp))
+                    Text(
+                        text = "Checklist salvo localmente. Será sincronizado com o Firebase assim que houver conexão.",
+                        style = MaterialTheme.typography.bodySmall.copy(
+                            color = MaterialTheme.colorScheme.onSurface,
+                            fontWeight = FontWeight.Medium
+                        )
+                    )
+                }
             }
         }
 
@@ -447,14 +561,14 @@ fun ChecklistDetailsSheetContent(
 
         Spacer(modifier = Modifier.height(10.dp))
 
-        // Iterate through all questions present in the document or prototype questions
+        // Iterate through all questions present in the document
         val questionsList = if (doc.answers.isNotEmpty()) {
             doc.answers.keys.sorted().map { questionId ->
-                val questionDefinition = CheckListItems.items.find { it.id == questionId }
+                val questionDefinition = CheckListItems.getQuestionById(questionId) ?: CheckListItems.items.find { it.id == questionId }
                 val title = questionDefinition?.title ?: "Item #$questionId"
-                val category = questionDefinition?.category ?: "Geral"
-                val isSim = doc.answers[questionId] ?: false
-                Triple(questionId, title, isSim)
+                val answerCode = doc.answers[questionId] ?: ChecklistAnswer.SIM.code
+                val answer = ChecklistAnswer.fromCode(answerCode)
+                Triple(questionId, title, answer)
             }
         } else {
             emptyList()
@@ -476,17 +590,17 @@ fun ChecklistDetailsSheetContent(
             }
         } else {
             Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                questionsList.forEach { (id, title, isSim) ->
-                    val itemBg = if (isSim) {
-                        if (isDark) Color(0xFF0F361C) else ExpressiveSuccessContainer.copy(alpha = 0.6f)
-                    } else {
-                        if (isDark) Color(0xFF491111) else ExpressiveErrorContainer.copy(alpha = 0.6f)
+                questionsList.forEach { (id, title, answer) ->
+                    val itemBg = when (answer) {
+                        ChecklistAnswer.SIM -> if (isDark) Color(0xFF0F361C) else ExpressiveSuccessContainer.copy(alpha = 0.6f)
+                        ChecklistAnswer.NAO -> if (isDark) Color(0xFF491111) else ExpressiveErrorContainer.copy(alpha = 0.6f)
+                        ChecklistAnswer.NAO_APLICA -> if (isDark) Color(0xFF3B2D05) else ExpressiveWarningContainer.copy(alpha = 0.6f)
                     }
 
-                    val itemColor = if (isSim) {
-                        if (isDark) Color(0xFF90F2B0) else ExpressiveSuccess
-                    } else {
-                        if (isDark) Color(0xFFFFB4AB) else ExpressiveError
+                    val itemColor = when (answer) {
+                        ChecklistAnswer.SIM -> if (isDark) Color(0xFF90F2B0) else ExpressiveSuccess
+                        ChecklistAnswer.NAO -> if (isDark) Color(0xFFFFB4AB) else ExpressiveError
+                        ChecklistAnswer.NAO_APLICA -> if (isDark) Color(0xFFFFD54F) else ExpressiveWarning
                     }
 
                     Card(
@@ -539,18 +653,23 @@ fun ChecklistDetailsSheetContent(
                                     modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp),
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
+                                    val icon = when (answer) {
+                                        ChecklistAnswer.SIM -> Icons.Default.Check
+                                        ChecklistAnswer.NAO -> Icons.Default.Close
+                                        ChecklistAnswer.NAO_APLICA -> Icons.Default.Remove
+                                    }
                                     Icon(
-                                        imageVector = if (isSim) Icons.Default.Check else Icons.Default.Close,
+                                        imageVector = icon,
                                         contentDescription = null,
-                                        tint = Color.White,
+                                        tint = if (isDark && answer == ChecklistAnswer.NAO_APLICA) Color(0xFF261900) else Color.White,
                                         modifier = Modifier.size(14.dp)
                                     )
                                     Spacer(modifier = Modifier.width(4.dp))
                                     Text(
-                                        text = if (isSim) "Sim" else "Não",
+                                        text = answer.shortLabel,
                                         style = MaterialTheme.typography.labelSmall.copy(
                                             fontWeight = FontWeight.Bold,
-                                            color = Color.White
+                                            color = if (isDark && answer == ChecklistAnswer.NAO_APLICA) Color(0xFF261900) else Color.White
                                         )
                                     )
                                 }

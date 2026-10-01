@@ -58,9 +58,9 @@ object PdfGenerator {
         canvas.drawText("COLABORADOR: ${colaborador.nome.uppercase()}", 40f, yPos, paint)
         yPos += 20f
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.NORMAL)
-        canvas.drawText("Matrícula: ${colaborador.matricula}   |   Localidade: ${colaborador.localidade}   |   Supervisor: ${colaborador.supervisor}", 40f, yPos, paint)
+        canvas.drawText("Matrícula: ${colaborador.matricula}   |   Localidade: ${colaborador.localidade}   |   Função: ${colaborador.funcaoDescricao}", 40f, yPos, paint)
         yPos += 20f
-        canvas.drawText("Telefone: ${colaborador.telefone}   |   Placa: ${colaborador.placa}   |   Ven. CNH: ${colaborador.venCnh}", 40f, yPos, paint)
+        canvas.drawText("Supervisor: ${colaborador.supervisor}   |   Placa: ${colaborador.placa}   |   Telefone: ${colaborador.telefone}", 40f, yPos, paint)
 
         // Section: Resumo das Respostas
         yPos = 210f
@@ -79,9 +79,10 @@ object PdfGenerator {
         paint.typeface = Typeface.create(Typeface.DEFAULT, Typeface.BOLD)
         canvas.drawText("ID", 35f, yPos + 17f, paint)
         canvas.drawText("Data / Horário", 70f, yPos + 17f, paint)
-        canvas.drawText("Conformes (Sim)", 210f, yPos + 17f, paint)
-        canvas.drawText("Não Conformes (Não)", 320f, yPos + 17f, paint)
-        canvas.drawText("Observação", 440f, yPos + 17f, paint)
+        canvas.drawText("Conformes (Sim)", 185f, yPos + 17f, paint)
+        canvas.drawText("N/A (Não Aplica)", 280f, yPos + 17f, paint)
+        canvas.drawText("Não Conformes (Não)", 375f, yPos + 17f, paint)
+        canvas.drawText("Observação", 480f, yPos + 17f, paint)
 
         yPos += 25f
 
@@ -103,14 +104,17 @@ object PdfGenerator {
                 canvas.drawText(DateUtils.formatDateTime(item.data), 70f, yPos + 15f, paint)
 
                 paint.color = Color.rgb(0, 120, 50)
-                canvas.drawText("${item.totalSim} itens (OK)", 210f, yPos + 15f, paint)
+                canvas.drawText("${item.totalSim} itens", 185f, yPos + 15f, paint)
 
-                paint.color = if (item.totalNao > 0) Color.rgb(180, 20, 20) else Color.rgb(80, 80, 80)
-                canvas.drawText("${item.totalNao} itens", 320f, yPos + 15f, paint)
+                paint.color = if (item.totalNa > 0) Color.rgb(210, 120, 0) else Color.rgb(100, 100, 100)
+                canvas.drawText("${item.totalNa} itens", 280f, yPos + 15f, paint)
+
+                paint.color = if (item.totalNao > 0) Color.rgb(180, 20, 20) else Color.rgb(100, 100, 100)
+                canvas.drawText("${item.totalNao} itens", 375f, yPos + 15f, paint)
 
                 paint.color = Color.rgb(30, 30, 30)
-                val obsTrimmed = if (item.observacao.length > 20) item.observacao.take(17) + "..." else item.observacao.ifEmpty { "-" }
-                canvas.drawText(obsTrimmed, 440f, yPos + 15f, paint)
+                val obsTrimmed = if (item.observacao.length > 16) item.observacao.take(13) + "..." else item.observacao.ifEmpty { "-" }
+                canvas.drawText(obsTrimmed, 480f, yPos + 15f, paint)
 
                 yPos += 22f
                 rowIndex++
@@ -121,9 +125,9 @@ object PdfGenerator {
         yPos += 25f
         paint.color = Color.rgb(100, 100, 100)
         paint.textSize = 9f
-        canvas.drawText("* Itens de conformidade por checklist inspecionados em campo.", 25f, yPos, paint)
+        canvas.drawText("* Itens marcados como N/A (Código 3 - Não Aplica) indicam ausência do objeto e NÃO configuram inconformidade.", 25f, yPos, paint)
         yPos += 14f
-        canvas.drawText("* Documento gerado automaticamente pelo aplicativo CheckOnline via Firebase Cloud Firestore.", 25f, yPos, paint)
+        canvas.drawText("* Itens de conformidade por checklist inspecionados em campo via CheckOnline.", 25f, yPos, paint)
 
         // Signatures area at bottom
         val sigY = 770f

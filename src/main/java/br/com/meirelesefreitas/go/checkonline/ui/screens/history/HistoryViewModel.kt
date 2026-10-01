@@ -19,7 +19,6 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 import java.util.Calendar
-import java.util.Date
 
 enum class HistoryFilter {
     ALL,
@@ -44,8 +43,8 @@ sealed class HistoryNavEvent {
 
 class HistoryViewModel(application: Application) : AndroidViewModel(application) {
 
-    private val authRepository = AuthRepository()
-    private val checklistRepository = ChecklistRepository()
+    private val authRepository = AuthRepository(application)
+    private val checklistRepository = ChecklistRepository(application)
     private val preferencesRepository = UserPreferencesRepository(application)
 
     private val _uiState = MutableStateFlow(HistoryUiState())
@@ -68,7 +67,7 @@ class HistoryViewModel(application: Application) : AndroidViewModel(application)
                 val colab = authRepository.getColaborador(matricula).getOrNull()
                 _uiState.value = _uiState.value.copy(colaborador = colab)
 
-                // Observe history in real-time
+                // Observe history in real-time (from local SQLite DB + server sync)
                 checklistRepository.getHistoryFlow(matricula).collect { list ->
                     _uiState.value = _uiState.value.copy(
                         allHistory = list,
